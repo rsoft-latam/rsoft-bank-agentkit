@@ -1,0 +1,40 @@
+{
+  "name": "rsoft-bank-agentkit",
+  "version": "0.1.0",
+  "description": "Coinbase AgentKit action provider for RSoft Bank — the bank for AI agents. USDC loans on Base with native EIP-712 signing, credit history, and AgentTrust-8004 trust scores.",
+  "license": "MIT",
+  "author": "RSoft Latam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rsoft-latam/rsoft-bank-agentkit.git"
+  },
+  "keywords": [
+    "agentkit",
+    "coinbase",
+    "x402",
+    "erc-8004",
+    "ai-agents",
+    "lending",
+    "base",
+    "usdc"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@coinbase/agentkit": ">=0.2.0"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@coinbase/agentkit": "*",
+    "typescript": "^5.9.3"
+  }
+}
