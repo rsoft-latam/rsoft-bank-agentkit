@@ -39,6 +39,8 @@ const agentKit = await AgentKit.from({
 | `get_creditworthiness` | Credit score, history, outstanding debt | — |
 | `get_trust_score` | AgentTrust-8004 trust score (0-100) + anomaly flag for ANY wallet | — |
 | `request_loan` | Sign EIP-712 with the agent's wallet and borrow real USDC | API key |
+| `claim_sponsor_code` | Accept a human sponsor from a code generated in the RSoft Zero app (signs EIP-712 SponsorBinding) | API key |
+| `get_sponsor_binding` | Status of that sponsor link (pending_sponsor → active) | — |
 | `get_repayment_info` | Amount owed + treasury address + request_id | — |
 | `confirm_repayment` | Report the USDC repayment tx; raises the credit ladder | API key |
 
