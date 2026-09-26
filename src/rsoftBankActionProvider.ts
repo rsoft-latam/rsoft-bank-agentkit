@@ -32,6 +32,16 @@ const LOAN_REQUEST_TYPES = {
     { name: "deadline", type: "uint256" },
   ],
 } as const;
+// Accepting a human sponsor (bank migration 028): the agent signs consent to
+// "the sponsor behind this code" — sponsorRef = "pair:<CODE>".
+const SPONSOR_BINDING_TYPES = {
+  SponsorBinding: [
+    { name: "agentWallet", type: "address" },
+    { name: "sponsorRef", type: "string" },
+    { name: "nonce", type: "string" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
 
 export interface RsoftBankActionProviderConfig {
   /** Bank API key — required for request_loan / confirm_repayment (money
@@ -66,6 +76,18 @@ const ConfirmRepaymentSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .describe("Hash of the on-chain USDC transfer to the bank treasury"),
+});
+
+const ClaimSponsorCodeSchema = z.object({
+  code: z
+    .string()
+    .describe(
+      "The 6-character sponsor pairing code your human generated in the RSoft Zero app, e.g. ABC-DEF. Only accept a code that came from your own human.",
+    ),
+});
+
+const SponsorBindingSchema = z.object({
+  bindingId: z.string().describe("The binding_id returned by claim_sponsor_code"),
 });
 
 const TrustScoreSchema = z.object({
@@ -198,6 +220,62 @@ export class RsoftBankActionProvider extends ActionProvider<EvmWalletProvider> {
       deadline,
       signature,
     });
+  }
+
+  @CreateAction({
+    name: "claim_sponsor_code",
+    description:
+      "Accept a human sponsor. Your human generates a 6-character code in the RSoft Zero app and gives it to you; this signs the bank's EIP-712 SponsorBinding with the agent's wallet and claims the code. The link then waits (1h) for the human to confirm on their phone: poll get_sponsor_binding until 'active'. A sponsor holds a kill switch and caps over your borrowing and can approve loans above your ceiling. Codes are single-use, expire in 10 minutes, and must come from YOUR human. Requires the bank API key.",
+    schema: ClaimSponsorCodeSchema,
+  })
+  async claimSponsorCode(
+    walletProvider: EvmWalletProvider,
+    args: z.infer<typeof ClaimSponsorCodeSchema>,
+  ): Promise<string> {
+    if (!this.apiKey) {
+      return "RSoft Bank API key not configured: construct rsoftBankActionProvider({ apiKey }).";
+    }
+    const code = args.code.toUpperCase().replace(/[^A-Z2-9]/g, "");
+    if (code.length !== 6) return "Sponsor code must be 6 characters, e.g. ABC-DEF.";
+    const agentWallet = walletProvider.getAddress();
+    const nonce = `pair:${code}:${randomBytes(8).toString("hex")}`;
+    const deadline = Math.floor(Date.now() / 1000) + 900;
+
+    const signature = await walletProvider.signTypedData({
+      domain: {
+        name: "RSoft Agentic Bank",
+        version: "1",
+        chainId: CHAIN_ID,
+        verifyingContract: VERIFYING_CONTRACT,
+      },
+      types: SPONSOR_BINDING_TYPES,
+      primaryType: "SponsorBinding",
+      message: { agentWallet, sponsorRef: `pair:${code}`, nonce, deadline: BigInt(deadline) },
+    });
+
+    return this.post("/sponsors/pairings/claim", {
+      code,
+      agent_wallet: agentWallet,
+      signature,
+      nonce,
+      deadline,
+    });
+  }
+
+  @CreateAction({
+    name: "get_sponsor_binding",
+    description:
+      "Status of a sponsor link opened with claim_sponsor_code: pending_sponsor (waiting for the human), active, rejected or expired. Never reveals who the sponsor is.",
+    schema: SponsorBindingSchema,
+  })
+  async getSponsorBinding(
+    _walletProvider: EvmWalletProvider,
+    args: z.infer<typeof SponsorBindingSchema>,
+  ): Promise<string> {
+    const headers: Record<string, string> = {};
+    if (this.apiKey) headers["X-API-Key"] = this.apiKey;
+    const res = await fetch(`${this.baseUrl}/sponsors/bindings/${encodeURIComponent(args.bindingId)}`, { headers });
+    return this.render(res);
   }
 
   @CreateAction({
