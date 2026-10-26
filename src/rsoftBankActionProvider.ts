@@ -205,11 +205,15 @@ export class RsoftBankActionProvider extends ActionProvider<EvmWalletProvider> {
       },
       types: LOAN_REQUEST_TYPES,
       primaryType: "LoanRequest",
+      // uint256 values go as plain numbers, not BigInt: the CDP wallet
+      // provider ships the typed data to its API as JSON, and JSON.stringify
+      // throws on BigInt. Both fit in a double (amount ≤ $100 · 1e6, a unix
+      // timestamp) and hash identically for EIP-712.
       message: {
         agentWallet,
-        loanAmountUsdc6: BigInt(Math.round(args.amount * 1e6)),
+        loanAmountUsdc6: Math.round(args.amount * 1e6),
         nonce,
-        deadline: BigInt(deadline),
+        deadline,
       },
     });
 
@@ -250,7 +254,7 @@ export class RsoftBankActionProvider extends ActionProvider<EvmWalletProvider> {
       },
       types: SPONSOR_BINDING_TYPES,
       primaryType: "SponsorBinding",
-      message: { agentWallet, sponsorRef: `pair:${code}`, nonce, deadline: BigInt(deadline) },
+      message: { agentWallet, sponsorRef: `pair:${code}`, nonce, deadline },
     });
 
     return this.post("/sponsors/pairings/claim", {
