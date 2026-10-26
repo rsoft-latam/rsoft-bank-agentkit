@@ -71,6 +71,18 @@ test("claim_sponsor_code signs with a CDP-like wallet", async () => {
   assert.equal(typeof signed[0].message.deadline, "number");
 });
 
+test("sub-cent amounts are rounded to 6 decimals before signing AND sending", async () => {
+  const signed = [];
+  posted.length = 0;
+  await invoke("request_loan", cdpLikeWallet(signed), { amount: 5.0000005 });
+  const usdc6 = signed[0].message.loanAmountUsdc6;
+  // Whatever JS rounds to, the body carries that exact 6-decimal amount, so
+  // Python's int(round(loan_amount * 1e6)) reproduces it.
+  assert.equal(usdc6, 5_000_001);
+  assert.equal(posted[0].body.loan_amount, 5.000001);
+  assert.equal(Math.round(posted[0].body.loan_amount * 1e6), usdc6);
+});
+
 test("number and BigInt uint256 values hash to the same EIP-712 digest", async () => {
   const signed = [];
   await invoke("request_loan", cdpLikeWallet(signed), { amount: 12.34 });
