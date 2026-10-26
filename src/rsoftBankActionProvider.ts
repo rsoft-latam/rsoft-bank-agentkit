@@ -195,6 +195,12 @@ export class RsoftBankActionProvider extends ActionProvider<EvmWalletProvider> {
     const agentWallet = walletProvider.getAddress();
     const nonce = "agentkit-" + randomBytes(8).toString("hex");
     const deadline = Math.floor(Date.now() / 1000) + 900;
+    // USDC has 6 decimals. Round once here and send the rounded amount, so
+    // the bank's own int(round(amount * 1e6)) lands on the same integer we
+    // sign (JS and Python round x.5 differently: 5.0000005 → 5000001 vs
+    // 5000000, and the signature would not verify).
+    const loanAmountUsdc6 = Math.round(args.amount * 1e6);
+    const amount = loanAmountUsdc6 / 1e6;
 
     const signature = await walletProvider.signTypedData({
       domain: {
@@ -211,7 +217,7 @@ export class RsoftBankActionProvider extends ActionProvider<EvmWalletProvider> {
       // timestamp) and hash identically for EIP-712.
       message: {
         agentWallet,
-        loanAmountUsdc6: Math.round(args.amount * 1e6),
+        loanAmountUsdc6,
         nonce,
         deadline,
       },
@@ -219,7 +225,7 @@ export class RsoftBankActionProvider extends ActionProvider<EvmWalletProvider> {
 
     return this.post("/loan/request", {
       agent_wallet: agentWallet,
-      loan_amount: args.amount,
+      loan_amount: amount,
       nonce,
       deadline,
       signature,
